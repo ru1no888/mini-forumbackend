@@ -79,7 +79,7 @@ app.get('/api/threads', async (req, res) => {
 });
 
 // 7. สร้าง API Endpoint: สร้างกระทู้ใหม่ (POST /api/threads)
-app.post('/api/threads', async (req, res) => {
+app.post('/api/threads/register', async (req, res) => {
     const { title, content, userId, categoryId } = req.body;
 
     // 1. สร้างกระทู้ (Thread)
