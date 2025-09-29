@@ -129,5 +129,52 @@ app.post('/api/threads', async (req, res) => {
     });
 });
 
+// 🆕 8. สร้าง API Endpoint: สมัครสมาชิก (POST /api/auth/register)
+// 🛑 นี่คือ Endpoint ที่ฟอร์มสมัครสมาชิกควรจะเรียกใช้
+app.post('/api/auth/register', async (req, res) => {
+    // โค้ดนี้ใช้ Supabase เพื่อบันทึกผู้ใช้ใหม่
+    const { username, email, password } = req.body;
+    
+    if (!username || !email || !password) {
+        return res.status(400).json({ error: 'Missing username, email, or password.' });
+    }
 
-// 8
+    try {
+        const passwordHash = 'DUMMY_HASH_' + Math.random().toString(36).substring(2, 15);
+        
+        // 1. สร้างผู้ใช้ในตาราง users (Supabase)
+        const { data: userData, error: userError } = await supabase
+            .from('users')
+            .insert([{ username, email, password_hash: passwordHash }])
+            .select('id')
+            .single();
+
+        if (userError) {
+            return res.status(409).json({ error: 'Registration failed. Username or email may already be in use.', details: userError.message });
+        }
+        
+        const newUserId = userData.id;
+
+        // 2. กำหนดบทบาท 'user' เริ่มต้น (Role ID 1 คือ 'user')
+        await supabase.from('user_roles').insert([{ user_id: newUserId, role_id: 1 }]); 
+
+        // 3. บันทึก Log การสมัครสมาชิก
+        if (mongoose.connection.readyState === 1) { 
+            await ActivityLog.create({
+                userId: newUserId, 
+                action: 'USER_REGISTERED',
+                details: { email: email }
+            });
+        }
+
+        // 4. ส่ง Response กลับไป
+        res.status(201).json({ 
+            message: 'Registration successful!', 
+            userId: newUserId 
+        });
+
+    } catch (error) {
+        console.error('Error during user registration:', error);
+        return res.status(500).json({ error: 'Server error during registration process.' });
+    }
+});
