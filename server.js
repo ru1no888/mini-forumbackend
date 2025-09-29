@@ -43,3 +43,42 @@ app.listen(port, () => {
     console.log('----------------------------------------------------');
     console.log('To test, go to: http://localhost:3000/api/threads');
 });
+app.post('/api/threads', async (req, res) => {
+    // ⚠️ ในโปรเจกต์จริง ต้องมีการตรวจสอบ User ID จาก Session/Token ก่อน
+    const { title, content, userId, categoryId } = req.body;
+
+    // 1. สร้างกระทู้ (Thread)
+    const { data: threadData, error: threadError } = await supabase
+        .from('threads')
+        .insert([{ title, user_id: userId, category_id: categoryId }])
+        .select()
+        .single(); // ดึงข้อมูลกระทู้ที่สร้างกลับมา
+
+    if (threadError) {
+        console.error('Error creating thread:', threadError);
+        return res.status(500).json({ error: 'Failed to create thread.' });
+    }
+
+    // 2. สร้างโพสต์แรก (Original Post)
+    const { data: postData, error: postError } = await supabase
+        .from('posts')
+        .insert([{ 
+            content: content, 
+            user_id: userId, 
+            thread_id: threadData.id, 
+            is_original_post: true 
+        }])
+        .select()
+        .single();
+
+    if (postError) {
+        console.error('Error creating post:', postError);
+        // หากเกิดข้อผิดพลาดในการสร้างโพสต์ ควรมีการ Rollback การสร้างกระทู้ด้วย
+        return res.status(500).json({ error: 'Failed to create original post.' });
+    }
+
+    res.status(201).json({ 
+        message: 'Thread and original post created successfully', 
+        threadId: threadData.id 
+    });
+});
