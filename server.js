@@ -178,3 +178,64 @@ app.post('/api/auth/register', async (req, res) => {
         return res.status(500).json({ error: 'Server error during registration process.' });
     }
 });
+
+// server.js (เพิ่มในส่วน API Endpoints)
+
+// 🆕 9. API Endpoint: ล็อกอิน (POST /api/auth/login)
+app.post('/api/auth/login', async (req, res) => {
+    // ⚠️ ในโปรเจกต์จริง ต้องมีการ hash รหัสผ่าน!
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Missing email or password.' });
+    }
+
+    try {
+        // 1. ค้นหาผู้ใช้จาก email (Supabase)
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('id, username, password_hash')
+            .eq('email', email)
+            .single();
+
+        if (error || !user) {
+            return res.status(401).json({ error: 'Invalid credentials.' });
+        }
+        
+        // 2. ตรวจสอบรหัสผ่าน (ในโปรเจกต์จริง: ใช้ bcrypt.compare)
+        // สำหรับ MVP: ตรวจสอบแค่ว่า password ไม่ใช่ค่าว่าง
+        if (user.password_hash === 'DUMMY_HASH' && password !== '') {
+            // รหัสผ่านถูกต้อง
+            
+            // 3. 🆕 สร้าง Token (ในโปรเจกต์จริง: ใช้ JWT)
+            // สำหรับ MVP: ส่งข้อมูลผู้ใช้กลับไปแทน Token จริง
+            const token = { 
+                userId: user.id, 
+                username: user.username,
+                role: 'user' // ต้องดึง role จาก user_roles ในโปรเจกต์จริง
+            };
+
+            // 4. บันทึก Log การล็อกอิน
+            if (mongoose.connection.readyState === 1) { 
+                await ActivityLog.create({
+                    userId: user.id, 
+                    action: 'USER_LOGIN_SUCCESS',
+                    details: { email: email }
+                });
+            }
+
+            // ส่งข้อมูลผู้ใช้และ Token กลับ
+            return res.status(200).json({ 
+                message: 'Login successful', 
+                token: token,
+                user: { id: user.id, username: user.username }
+            });
+        } else {
+            return res.status(401).json({ error: 'Invalid credentials.' });
+        }
+
+    } catch (error) {
+        console.error('Error during user login:', error);
+        return res.status(500).json({ error: 'Server error during login process.' });
+    }
+});
